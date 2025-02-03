@@ -5,11 +5,10 @@ import pytz
 from aiohttp import ClientSession
 from json.decoder import JSONDecodeError
 from typing import List, Any
+from .enum import EnergyType
 
 DATA_URL = "https://lifeapi.gazdebordeaux.fr{0}/consumptions"
 LOGIN_URL = "https://lifeapi.gazdebordeaux.fr/login_check"
-ME_URL = "https://lifeapi.gazdebordeaux.fr/users/me"
-HOUSE_URL = "https://lifeapi.gazdebordeaux.fr${0}"
 HOUSES_URL = "https://lifeapi.gazdebordeaux.fr/addresses"
 
 INPUT_DATE_FORMAT = "%Y-%m-%d"
@@ -44,7 +43,7 @@ class House:
     remoteAddressId: str
     address: str
     selected: bool
-    contractCategory: str # "gas" or "electricity"
+    energyType: EnergyType
     contractCode: str
     priceCategory: str
     offPeakTimes: None|List[OffPeakTime]
@@ -56,6 +55,7 @@ class Gazdebordeaux:
         self._password = password
         self._token: str|None = token
         self._selectedHouse: str|None = house
+        self._energyType: EnergyType|None = None
 
     async def async_login(self):
         Logger.debug("Loging in...")
@@ -98,7 +98,6 @@ class Gazdebordeaux:
                 price = daily_data[d]["price"],
                 ratio = daily_data[d]["ratio"],
                 temperature = daily_data[d]["temperature"],
-
             ))
         
         # Logger.debug("Data transformed: %s", usageReads)
@@ -112,20 +111,15 @@ class Gazdebordeaux:
             if self._token is None:
                 return None
 
-            if self._selectedHouse is None:
-                await self.loadHouse()
-                Logger.debug("Loading last selected house")
+            if self._selectedHouse is None or self._energyType is None:
+                await self.loadHouse(self._selectedHouse)
 
-            Logger.debug("Loaded house info: %s", self._selectedHouse)
+            Logger.debug("Loaded house info: %s", self._selectedHouse, self._energyType)
 
             headers = {
                 "Authorization": "Bearer " + self._token,
                 "Connection": "keep-alive",
                 "Content-Type": "application/json"
-            }
-            payload = {
-                "email":self._username,
-                "password":self._password
             }
             params = {
                 "scale": scale
@@ -135,7 +129,7 @@ class Gazdebordeaux:
             if end is not None:
                 params["endDate"] = end.strftime("%Y-%m-%d")
 
-            async with self._session.get(DATA_URL.format(self._selectedHouse), headers=headers, json=payload, params=params) as response:
+            async with self._session.get(DATA_URL.format(self._selectedHouse), headers=headers, params=params) as response:
                 return await response.json()
 
         except Exception:
@@ -173,14 +167,17 @@ class Gazdebordeaux:
                             endTime=time(hour=int(x[0].split(":")[0]), minute=int(x[0].split(":")[1])),
                         ), offPeakTimeData))
 
+                    energyTypeData = houses_data[d]["contractType"]["category"]
+                    energyType = EnergyType.ELECTRICITY if energyTypeData == "electricity" else EnergyType.GAS
+          
                     houses.append(House(
-                        id= houses_data[d]["@id"],
-                        remoteAddressId= houses_data[d]["remoteAddressId"],
-                        address= houses_data[d]["addressStreet"],
-                        selected= houses_data[d]["selected"],
-                        contractCategory= houses_data[d]["contractType"]["category"],
-                        contractCode= houses_data[d]["contractType"]["code"],
-                        priceCategory= houses_data[d]["priceCategory"],
+                        id=houses_data[d]["@id"],
+                        remoteAddressId=houses_data[d]["remoteAddressId"],
+                        address=houses_data[d]["addressStreet"],
+                        selected=houses_data[d]["selected"],
+                        energyType=energyType,
+                        contractCode=houses_data[d]["contractType"]["code"],
+                        priceCategory=houses_data[d]["priceCategory"],
                         offPeakTimes=offPeakTimes
                     ))
                 
@@ -191,16 +188,17 @@ class Gazdebordeaux:
                 Logger.error("An unexpected error occured while loading the houses list", exc_info=True)
                 raise
 
-    async def loadHouse(self):
+    async def loadHouse(self, id: str|None):
         houses = await self.async_get_houses()
 
         if houses is None or len(houses) == 0:
             raise
         
-        selectedHouse = next(house for house in houses if house.selected)
+        selectedHouse = next(house for house in houses if (id == None and house.selected) or house.id == id)
 
         if selectedHouse is None:
             raise
 
         self._selectedHouse = selectedHouse.id
+        self._energyType = selectedHouse.energyType
         return selectedHouse

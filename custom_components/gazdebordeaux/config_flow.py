@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.selector import selector
 
-from .const import DOMAIN, HOUSE
+from .const import DOMAIN, HOUSE, ENERGY_TYPE
 from .gazdebordeaux import Gazdebordeaux, House
 from .option_flow import GazdebordeauxOptionFlow
 
@@ -109,6 +109,7 @@ class GazdebordeauxConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def _async_create_gazdebordeaux_entry(self, data: dict[str, Any], house: House) -> ConfigFlowResult:
         """Create the config entry."""
+        data[ENERGY_TYPE] = house.contractCategory
         return self.async_create_entry(
             title=f"({data[CONF_USERNAME]}) - {house.address} - {house.remoteAddressId} ({house.contractCategory})",
             data=data,

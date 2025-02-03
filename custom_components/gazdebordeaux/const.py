@@ -3,3 +3,4 @@
 DOMAIN = "gazdebordeaux"
 RESET_STATISTICS = "reset_stats"
 HOUSE = "house"
+ENERGY_TYPE = "energy_type"

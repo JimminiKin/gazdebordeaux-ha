@@ -14,7 +14,7 @@ from homeassistant.components.recorder.statistics import (
     get_last_statistics,
     statistics_during_period
 )
-from homeassistant.config_entries import ConfigEntries, ConfigEntry
+from homeassistant.helpers
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, UnitOfEnergy, UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -24,7 +24,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-
 
 class GdbCoordinator(DataUpdateCoordinator[TotalUsageRead]):
     """Handle fetching GazdeBordeaux data, updating sensors and inserting statistics."""
@@ -151,7 +150,7 @@ class GdbCoordinator(DataUpdateCoordinator[TotalUsageRead]):
                 {cost_statistic_id, consumption_statistic_id, volume_statistic_id},
                 "day",
                 None,
-                {"sate", "sum"},
+                {"sum"},
             )
             # s:StatisticsRow =stats[cost_statistic_id][0]
             
